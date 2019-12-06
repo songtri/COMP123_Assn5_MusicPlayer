@@ -179,10 +179,20 @@ namespace MusicPlayer
 
 		private void SetSongInfo()
 		{
-			LblAlbumName.Text = CurrentSong.Album;
-			LblArtistName.Text = CurrentSong.Artist;
-			LblSongName.Text = CurrentSong.Title;
-			Text = $"MusicPlayer - {CurrentSong.Title}";
+			if (CurrentSong != null)
+			{
+				LblAlbumName.Text = CurrentSong.Album;
+				LblArtistName.Text = CurrentSong.Artist;
+				LblSongName.Text = CurrentSong.Title;
+				Text = $"MusicPlayer - {CurrentSong.Title}";
+			}
+			else
+			{
+				LblAlbumName.Text = string.Empty;
+				LblArtistName.Text = string.Empty;
+				LblSongName.Text = string.Empty;
+				Text = $"MusicPlayer";
+			}
 		}
 
 		private bool MoveSelection(int movement)
@@ -237,7 +247,7 @@ namespace MusicPlayer
 
 		private void BtnPlay_Click(object sender, EventArgs e)
 		{
-			if (Playlist == null)
+			if (DgrPlaylist.Rows.Count <= 0)
 				return;
 
 			if (WindowsMediaPlayer.playState == WMPPlayState.wmppsPlaying)
@@ -259,7 +269,7 @@ namespace MusicPlayer
 
 		private void BtnStop_Click(object sender, EventArgs e)
 		{
-			if (Playlist == null)
+			if (DgrPlaylist.Rows.Count <= 0)
 				return;
 
 			ResetPlayList();
@@ -267,10 +277,7 @@ namespace MusicPlayer
 
 		private void BtnPrev_Click(object sender, EventArgs e)
 		{
-			if (Playlist == null)
-				return;
-
-			if (DgrPlaylist.SelectedRows.Count <= 0)
+			if (DgrPlaylist.Rows.Count <= 0)
 				return;
 
 			if (MoveSelection(-1))
@@ -279,7 +286,7 @@ namespace MusicPlayer
 
 		private void BtnNext_Click(object sender, EventArgs e)
 		{
-			if (Playlist == null)
+			if (DgrPlaylist.Rows.Count <= 0)
 				return;
 
 			if (MoveSelection(1))
@@ -288,7 +295,7 @@ namespace MusicPlayer
 
 		private void ChkShuffle_Click(object sender, EventArgs e)
 		{
-			if (Playlist == null)
+			if (DgrPlaylist.Rows.Count <= 0)
 				return;
 
 			ChkShuffle.Checked = !ChkShuffle.Checked;
@@ -305,9 +312,13 @@ namespace MusicPlayer
 		{
 			WindowsMediaPlayer.controls.stop();
 			DgrPlaylist.ClearSelection();
-			DgrPlaylist.Rows[0].Selected = true;
+			if (DgrPlaylist.Rows.Count > 0)
+				DgrPlaylist.Rows[0].Selected = true;
 			BtnPlay.Text = PlayText[0];
-			CurrentSong = Playlist.SongList[0];
+			if (Playlist.SongList.Count > 0)
+				CurrentSong = Playlist.SongList[0];
+			else
+				CurrentSong = null;
 			SetSongInfo();
 			InitShuffleIndex();
 			if (ChkShuffle.Checked)
@@ -474,7 +485,7 @@ namespace MusicPlayer
 
 		private void PlaytimeTrackTimer_Tick(object sender, EventArgs e)
 		{
-			if (Playlist == null)
+			if (DgrPlaylist.Rows.Count <= 0)
 				return;
 
 			if (WindowsMediaPlayer.currentItem != null)
@@ -542,7 +553,7 @@ namespace MusicPlayer
 
 		private void SliderPlaying_Scroll(object sender, EventArgs e)
 		{
-			if (Playlist == null)
+			if (DgrPlaylist.Rows.Count <= 0)
 				return;
 
 			if (WindowsMediaPlayer.currentItem != null)
