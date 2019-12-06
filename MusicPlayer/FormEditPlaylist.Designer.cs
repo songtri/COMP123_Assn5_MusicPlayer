@@ -206,6 +206,7 @@
 			// SavePlaylistFileDialog
 			// 
 			this.SavePlaylistFileDialog.DefaultExt = "jpl";
+			this.SavePlaylistFileDialog.FileName = " ";
 			this.SavePlaylistFileDialog.Filter = "MusicPlayer Playlist File|*.jpl";
 			this.SavePlaylistFileDialog.Title = "Save Playlist";
 			// 
