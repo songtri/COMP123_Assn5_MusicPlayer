@@ -1,17 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Data;
 using System.Diagnostics;
-using System.Drawing;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
 using System.Web.Script.Serialization;
 using System.Windows.Forms;
-using MediaPlayer;
 using WMPLib;
 
 public enum SortMethod
@@ -35,21 +29,25 @@ namespace MusicPlayer
 												"Artist Name (Ascending)", "Artist Name (Descending)",
 												"Song Name (Ascending)", "Song Name (Descending)"};
 		readonly string[] PlayText = { "▶", "❚❚" };
-		Playlist Playlist = null;
-		Song CurrentSong = null;
-		readonly int InitialPlaylistWidth = 0;
-		MediaPlayerClass Player = new MediaPlayerClass();
-		WindowsMediaPlayerClass WindowsMediaPlayer = new WMPLib.WindowsMediaPlayerClass();
+		private Playlist Playlist = null;
+		private Song CurrentSong = null;
+		private readonly int InitialPlaylistWidth = 0;
+		private WindowsMediaPlayerClass WindowsMediaPlayer = new WMPLib.WindowsMediaPlayerClass();
+		private const int IntervalBetweenTransition = 500;
+		private int transitionTime = 0;
+		private bool prepareNextSong = false;
+		private int[] ShuffleIndex;
+		private int CurrentShuffleIndexPlaying;
 
 		public MusicPlayer()
 		{
 			InitializeComponent();
-			//ShowSplashScreen();
+			ShowSplashScreen();
 			InitGui();
 			InitialPlaylistWidth = DgrPlaylist.Width;
 		}
 
-		void ShowSplashScreen()
+		private void ShowSplashScreen()
 		{
 			using (FormSplash splash = new FormSplash())
 			{
@@ -57,7 +55,31 @@ namespace MusicPlayer
 			}
 		}
 
-		void InitGui()
+		private void InitShuffleIndex()
+		{
+			if (Playlist == null)
+				return;
+
+			ShuffleIndex = new int[DgrPlaylist.Rows.Count];
+			for (int i = 0; i < ShuffleIndex.Length; ++i)
+				ShuffleIndex[i] = i;
+
+			CurrentShuffleIndexPlaying = 0;
+		}
+
+		private void MakeShuffleIndex()
+		{
+			Random random = new Random();
+			for (int i = 0; i < DgrPlaylist.Rows.Count - 1; ++i)
+			{
+				int randNum = random.Next(0, DgrPlaylist.Rows.Count);
+				int temp = ShuffleIndex[i];
+				ShuffleIndex[i] = ShuffleIndex[randNum];
+				ShuffleIndex[randNum] = temp;
+			}
+		}
+
+		private void InitGui()
 		{
 			LblAlbumName.Text = string.Empty;
 			LblArtistName.Text = string.Empty;
@@ -76,43 +98,44 @@ namespace MusicPlayer
 			Playlist = null;
 			CurrentSong = null;
 			BtnPlay.Text = PlayText[0];
-			Player.PlayStateChange += OnPlayStateChanged;
-			Player.OpenStateChange += Player_OpenStateChange;
-			Player.ReadyStateChange += Player_ReadyStateChange;
 			WindowsMediaPlayer.OpenStateChange += WindowsMediaPlayer_OpenStateChange;
 			WindowsMediaPlayer.PlayStateChange += WindowsMediaPlayer_PlayStateChange;
 			WindowsMediaPlayer.PositionChange += WindowsMediaPlayer_PositionChange;
+			WindowsMediaPlayer.autoStart = false;
+
+			CurrentShuffleIndexPlaying = 0;
 		}
 
 		private void WindowsMediaPlayer_PositionChange(double oldPosition, double newPosition)
 		{
-			LblPlayingTime.Text = $"{WindowsMediaPlayer.currentPositionString} / {WindowsMediaPlayer.currentItem.durationString}";
+			if (Playlist == null)
+				return;
+
+			if (WindowsMediaPlayer.currentItem != null)
+			{
+				LblPlayingTime.Text = $"{WindowsMediaPlayer.currentPositionString} / {WindowsMediaPlayer.currentItem.durationString}";
+			}
 		}
 
 		private void WindowsMediaPlayer_PlayStateChange(int NewState)
 		{
 			WMPPlayState playState = (WMPPlayState)NewState;
-			//if(playState == WMPPlayState)
 			Debug.WriteLine(playState);
+			if (playState == WMPPlayState.wmppsStopped)
+			{
+				transitionTime = 0;
+				prepareNextSong = true;
+			}
 		}
 
 		private void WindowsMediaPlayer_OpenStateChange(int NewState)
 		{
 			WMPOpenState openState = (WMPOpenState)NewState;
+			Debug.WriteLine(openState);
 			if (openState == WMPOpenState.wmposMediaOpen)
 			{
 				LblPlayingTime.Text = $"{WindowsMediaPlayer.currentPositionString} / {WindowsMediaPlayer.currentItem.durationString}";
-				//LblPlayingTime.Text = $" 00:00:00/{(int)WindowsMediaPlayer.duration / 3600:D2}:{((int)Player.Duration / 60) % 60:D2}:{(int)Player.Duration % 60:D2}";
 			}
-		}
-
-		private void Player_ReadyStateChange(MPReadyStateConstants ReadyState)
-		{
-			throw new NotImplementedException();
-		}
-
-		private void Player_OpenStateChange(int OldState, int NewState)
-		{
 		}
 
 		private void PlaySelectedRow()
@@ -121,13 +144,37 @@ namespace MusicPlayer
 				return;
 
 			int index = DgrPlaylist.SelectedRows[0].Index;
-			//Player.Open(Playlist.SongList[index].FilePath);
-			//Debug.WriteLine(Player.OpenState);
-			//Player.Play();
-			//CurrentSong = Playlist.SongList[index];
-			//SetSongInfo();
-			WindowsMediaPlayer.URL = Playlist.SongList[index].FilePath;
+			var song = DgrPlaylist.SelectedRows[0].DataBoundItem as Song;
+			if (song != null)
+				CurrentSong = song;
+			WindowsMediaPlayer.URL = CurrentSong.FilePath;
 			WindowsMediaPlayer.controls.play();
+			SetSongInfo();
+		}
+
+		private void PlayNextSong()
+		{
+			if (ChkRepeatMode.Checked && RadioRepeatSong.Checked)
+			{
+				WindowsMediaPlayer.controls.play();
+			}
+			else if (ChkRepeatMode.Checked && RadioRepeatAll.Checked)
+			{
+				MoveSelection(1);
+				PlaySelectedRow();
+			}
+			else
+			{
+				if (DgrPlaylist.SelectedRows[0].Index < DgrPlaylist.Rows.Count - 1)
+				{
+					MoveSelection(1);
+					PlaySelectedRow();
+				}
+				else
+				{
+					ResetPlayList();
+				}
+			}
 		}
 
 		private void SetSongInfo()
@@ -136,12 +183,51 @@ namespace MusicPlayer
 			LblArtistName.Text = CurrentSong.Artist;
 			LblSongName.Text = CurrentSong.Title;
 			Text = $"MusicPlayer - {CurrentSong.Title}";
-			//LblPlayingTime.Text = $" 00:00:00/{(int)Player.Duration/3600:D2}:{((int)Player.Duration/60)%60:D2}:{(int)Player.Duration%60:D2}";
 		}
 
-		private void OnPlayStateChanged(int OldState, int NewState)
+		private bool MoveSelection(int movement)
 		{
-			Player.Play();
+			int nextIndex;
+			if (ChkShuffle.Checked)
+			{
+				CurrentShuffleIndexPlaying += movement;
+				if (CurrentShuffleIndexPlaying < 0)
+				{
+					if (ChkRepeatMode.Checked && RadioRepeatAll.Checked)
+						CurrentShuffleIndexPlaying = ShuffleIndex.Length - 1;
+					else
+						return false;
+				}
+				if (CurrentShuffleIndexPlaying > ShuffleIndex.Length - 1)
+				{
+					if (ChkRepeatMode.Checked && RadioRepeatAll.Checked)
+						CurrentShuffleIndexPlaying = 0;
+					else
+						return false;
+				}
+				nextIndex = ShuffleIndex[CurrentShuffleIndexPlaying];
+			}
+			else
+				nextIndex = DgrPlaylist.SelectedRows[0].Index + movement;
+
+			if (nextIndex < 0)
+			{
+				if (ChkRepeatMode.Checked && RadioRepeatAll.Checked)
+					nextIndex = DgrPlaylist.Rows.Count - 1;
+				else
+					return false;
+			}
+			if (nextIndex > DgrPlaylist.Rows.Count - 1)
+			{
+				if (ChkRepeatMode.Checked && RadioRepeatAll.Checked)
+					nextIndex = 0;
+				else
+					return false;
+			}
+
+			DgrPlaylist.ClearSelection();
+			DgrPlaylist.Rows[nextIndex].Selected = true;
+			return true;
 		}
 
 		private void BtnPlay_Click(object sender, EventArgs e)
@@ -149,16 +235,13 @@ namespace MusicPlayer
 			if (Playlist == null)
 				return;
 
-			if (Player.PlayState == MPPlayStateConstants.mpPlaying || WindowsMediaPlayer.playState == WMPPlayState.wmppsPlaying)
+			if (WindowsMediaPlayer.playState == WMPPlayState.wmppsPlaying)
 			{
-				//Player.Pause();
 				BtnPlay.Text = PlayText[0];
-				//Debug.WriteLine(Player.OpenState);
 				WindowsMediaPlayer.controls.pause();
 			}
-			else if (Player.PlayState == MPPlayStateConstants.mpPaused || WindowsMediaPlayer.playState == WMPPlayState.wmppsPaused)
+			else if (WindowsMediaPlayer.playState == WMPPlayState.wmppsPaused)
 			{
-				//Player.Play();
 				WindowsMediaPlayer.controls.play();
 				BtnPlay.Text = PlayText[1];
 			}
@@ -174,13 +257,7 @@ namespace MusicPlayer
 			if (Playlist == null)
 				return;
 
-			//Player.Stop();
-			WindowsMediaPlayer.controls.stop();
-			DgrPlaylist.ClearSelection();
-			DgrPlaylist.Rows[0].Selected = true;
-			BtnPlay.Text = PlayText[0];
-			CurrentSong = Playlist.SongList[0];
-			SetSongInfo();
+			ResetPlayList();
 		}
 
 		private void BtnPrev_Click(object sender, EventArgs e)
@@ -191,14 +268,8 @@ namespace MusicPlayer
 			if (DgrPlaylist.SelectedRows.Count <= 0)
 				return;
 
-			int selectedRowIndex = DgrPlaylist.SelectedRows[0].Index;
-			if (selectedRowIndex <= 0)
-				return;
-
-			DgrPlaylist.ClearSelection();
-			DgrPlaylist.Rows[selectedRowIndex - 1].Selected = true;
-
-			PlaySelectedRow();
+			if (MoveSelection(-1))
+				PlaySelectedRow();
 		}
 
 		private void BtnNext_Click(object sender, EventArgs e)
@@ -206,36 +277,35 @@ namespace MusicPlayer
 			if (Playlist == null)
 				return;
 
-			int selectedRowIndex = DgrPlaylist.SelectedRows[0].Index;
-			if (selectedRowIndex >= DgrPlaylist.Rows.Count - 1)
+			if (MoveSelection(1))
+				PlaySelectedRow();
+		}
+
+		private void ChkShuffle_Click(object sender, EventArgs e)
+		{
+			if (Playlist == null)
 				return;
 
+			ChkShuffle.Checked = !ChkShuffle.Checked;
+			if (ChkShuffle.Checked)
+			{
+				MakeShuffleIndex();
+				MoveSelection(0);
+			}
+			else
+				InitShuffleIndex();
+		}
+
+		private void ResetPlayList()
+		{
 			DgrPlaylist.ClearSelection();
-			DgrPlaylist.Rows[selectedRowIndex + 1].Selected = true;
-
-			PlaySelectedRow();
-		}
-
-		private void ChkRepeatMode_CheckedChanged(object sender, EventArgs e)
-		{
-		}
-
-		private void ChkShuffle_CheckedChanged(object sender, EventArgs e)
-		{
-			if (Playlist == null)
-				return;
-		}
-
-		private void RadioRepeatSong_CheckedChanged(object sender, EventArgs e)
-		{
-			if (Playlist == null)
-				return;
-		}
-
-		private void RadioRepeatAlbum_CheckedChanged(object sender, EventArgs e)
-		{
-			if (Playlist == null)
-				return;
+			DgrPlaylist.Rows[0].Selected = true;
+			BtnPlay.Text = PlayText[0];
+			CurrentSong = Playlist.SongList[0];
+			SetSongInfo();
+			InitShuffleIndex();
+			if (ChkShuffle.Checked)
+				MakeShuffleIndex();
 		}
 
 		private void BtnLoadPlaylist_Click(object sender, EventArgs e)
@@ -244,8 +314,7 @@ namespace MusicPlayer
 			if (DialogResult.OK == OpenPlaylistFileDialog.ShowDialog())
 			{
 				LoadPlaylist(OpenPlaylistFileDialog.FileName);
-				CurrentSong = Playlist.SongList[0];
-				SetSongInfo();
+				ResetPlayList();
 			}
 		}
 
@@ -321,16 +390,51 @@ namespace MusicPlayer
 			if (Playlist == null)
 				return;
 
-			SortMethod method = (SortMethod)ComboSortPlaylist.SelectedIndex;
-			SortPlaylist(method);
+			RefreshList();
 		}
 
-		private void SortPlaylist(SortMethod method)
+		private void RefreshList()
 		{
-			var list = Playlist.SortSongList(method);
+			SortMethod method = (SortMethod)ComboSortPlaylist.SelectedIndex;
+
+			List<Song> songList = DgrPlaylist.DataSource as List<Song>;
+			List<Song> sortedList = new List<Song>();
+
+			switch (method)
+			{
+				case SortMethod.Default:
+					sortedList.AddRange(songList);
+					break;
+				case SortMethod.DefaultReverse:
+					sortedList.AddRange(songList);
+					sortedList.Reverse();
+					break;
+				case SortMethod.Album:
+					sortedList.AddRange(from s in songList orderby s.Album ascending select s);
+					break;
+				case SortMethod.AlbumReverse:
+					sortedList.AddRange(from s in songList orderby s.Album descending select s);
+					break;
+				case SortMethod.Artist:
+					sortedList.AddRange(from s in songList orderby s.Artist ascending select s);
+					break;
+				case SortMethod.ArtistReverse:
+					sortedList.AddRange(from s in songList orderby s.Artist descending select s);
+					break;
+				case SortMethod.Song:
+					sortedList.AddRange(from s in songList orderby s.Title ascending select s);
+					break;
+				case SortMethod.SongReverse:
+					sortedList.AddRange(from s in songList orderby s.Title descending select s);
+					break;
+				default:
+					break;
+			}
 
 			DgrPlaylist.DataSource = null;
-			DgrPlaylist.DataSource = list;
+			DgrPlaylist.DataSource = sortedList;
+
+			ResetPlayList();
 		}
 
 		public void ApplyPlaylist(Playlist playlist)
@@ -339,20 +443,98 @@ namespace MusicPlayer
 
 			DgrPlaylist.DataSource = null;
 			DgrPlaylist.DataSource = Playlist.SongList;
+
+			ResetPlayList();
 		}
 
 		private void ChkRepeatMode_Click(object sender, EventArgs e)
 		{
-			if (Playlist == null)
-				return;
-
 			ChkRepeatMode.Checked = !ChkRepeatMode.Checked;
 			GrpRepeatMode.Enabled = ChkRepeatMode.Checked;
+
+			if (!RadioRepeatSong.Checked && !RadioRepeatAll.Checked)
+				RadioRepeatSong.Checked = true;
 		}
 
 		private void PlaytimeTrackTimer_Tick(object sender, EventArgs e)
 		{
+			if (Playlist == null)
+				return;
 
+			if (WindowsMediaPlayer.currentItem != null)
+			{
+				string currentPosition;
+				if (string.IsNullOrEmpty(WindowsMediaPlayer.currentPositionString))
+					currentPosition = "00:00";
+				else
+					currentPosition = WindowsMediaPlayer.currentPositionString;
+				LblPlayingTime.Text = $"{currentPosition} / {WindowsMediaPlayer.currentItem.durationString}";
+				if(WindowsMediaPlayer.currentItem.duration > 0)
+					SliderPlaying.Value = (int)(WindowsMediaPlayer.currentPosition / WindowsMediaPlayer.currentItem.duration * SliderPlaying.Maximum);
+			}
+
+			if (prepareNextSong)
+			{
+				transitionTime += PlaytimeTrackTimer.Interval;
+				if (transitionTime > IntervalBetweenTransition)
+				{
+					PlayNextSong();
+					prepareNextSong = false;
+				}
+			}
+		}
+
+		private void TxtSearchPlaylist_TextChanged(object sender, EventArgs e)
+		{
+			SearchSong();
+		}
+
+		private void TxtSearchPlaylist_KeyUp(object sender, KeyEventArgs e)
+		{
+			if (e.KeyCode == Keys.Enter)
+				SearchSong();
+		}
+
+		private void BtnSearchPlaylist_Click(object sender, EventArgs e)
+		{
+			SearchSong();
+		}
+
+		private void SearchSong()
+		{
+			if (TxtSearchPlaylist.Text.Length <= 0)
+			{
+				DgrPlaylist.DataSource = null;
+				DgrPlaylist.DataSource = Playlist.SongList;
+				RefreshList();
+			}
+			else
+			{
+				string lowCaseSearchText = TxtSearchPlaylist.Text.ToLower();
+				var list = from s
+							in Playlist.SongList
+							where s.Title.ToLower().Contains(lowCaseSearchText) || s.Album.ToLower().Contains(lowCaseSearchText) || s.Artist.ToLower().Contains(lowCaseSearchText)
+							select s;
+				List<Song> songList = new List<Song>(list);
+
+				DgrPlaylist.DataSource = null;
+				DgrPlaylist.DataSource = songList;
+
+				RefreshList();
+			}
+		}
+
+		private void SliderPlaying_Scroll(object sender, EventArgs e)
+		{
+			if (Playlist == null)
+				return;
+
+			if (WindowsMediaPlayer.currentItem != null)
+			{
+				double relativePosition = (double)SliderPlaying.Value / SliderPlaying.Maximum;
+				double position = WindowsMediaPlayer.currentItem.duration * relativePosition;
+				WindowsMediaPlayer.currentPosition = position;
+			}
 		}
 	}
 }

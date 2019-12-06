@@ -1,9 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace MusicPlayer
 {
@@ -52,11 +50,6 @@ namespace MusicPlayer
 			{
 				song.Track = index++;
 			}
-		}
-
-		public int GetSongIndex(Song song)
-		{
-			return SongList.FindIndex(s => s == song);
 		}
 
 		public void AddPlayilist(List<string> songFilePaths)
@@ -116,44 +109,6 @@ namespace MusicPlayer
 			var path = filePath.Split('\\');
 			string filename = path[path.Length - 1];
 			return filename.Replace(".mp3", "");
-		}
-
-		public List<Song> SortSongList(SortMethod method)
-		{
-			List<Song> sortedList = new List<Song>();
-
-			switch (method)
-			{
-				case SortMethod.Default:
-					sortedList.AddRange(SongList);
-					break;
-				case SortMethod.DefaultReverse:
-					sortedList.AddRange(SongList);
-					sortedList.Reverse();
-					break;
-				case SortMethod.Album:
-					sortedList.AddRange(from s in SongList orderby s.Album ascending select s);
-					break;
-				case SortMethod.AlbumReverse:
-					sortedList.AddRange(from s in SongList orderby s.Album descending select s);
-					break;
-				case SortMethod.Artist:
-					sortedList.AddRange(from s in SongList orderby s.Artist ascending select s);
-					break;
-				case SortMethod.ArtistReverse:
-					sortedList.AddRange(from s in SongList orderby s.Artist descending select s);
-					break;
-				case SortMethod.Song:
-					sortedList.AddRange(from s in SongList orderby s.Title ascending select s);
-					break;
-				case SortMethod.SongReverse:
-					sortedList.AddRange(from s in SongList orderby s.Title descending select s);
-					break;
-				default:
-					break;
-			}
-
-			return sortedList;
 		}
 	}
 
