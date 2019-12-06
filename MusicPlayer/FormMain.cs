@@ -32,7 +32,7 @@ namespace MusicPlayer
 		private Playlist Playlist = null;
 		private Song CurrentSong = null;
 		private readonly int InitialPlaylistWidth = 0;
-		private WindowsMediaPlayerClass WindowsMediaPlayer = new WMPLib.WindowsMediaPlayerClass();
+		private readonly WindowsMediaPlayerClass WindowsMediaPlayer = new WindowsMediaPlayerClass();
 		private const int IntervalBetweenTransition = 500;
 		private int transitionTime = 0;
 		private bool prepareNextSong = false;
@@ -120,7 +120,6 @@ namespace MusicPlayer
 		private void WindowsMediaPlayer_PlayStateChange(int NewState)
 		{
 			WMPPlayState playState = (WMPPlayState)NewState;
-			Debug.WriteLine(playState);
 			if (playState == WMPPlayState.wmppsStopped)
 			{
 				transitionTime = 0;
@@ -131,7 +130,6 @@ namespace MusicPlayer
 		private void WindowsMediaPlayer_OpenStateChange(int NewState)
 		{
 			WMPOpenState openState = (WMPOpenState)NewState;
-			Debug.WriteLine(openState);
 			if (openState == WMPOpenState.wmposMediaOpen)
 			{
 				LblPlayingTime.Text = $"{WindowsMediaPlayer.currentPositionString} / {WindowsMediaPlayer.currentItem.durationString}";
@@ -143,8 +141,7 @@ namespace MusicPlayer
 			if (DgrPlaylist.SelectedRows.Count <= 0)
 				return;
 
-			int index = DgrPlaylist.SelectedRows[0].Index;
-			var song = DgrPlaylist.SelectedRows[0].DataBoundItem as Song;
+			Song song = DgrPlaylist.SelectedRows[0].DataBoundItem as Song;
 			if (song != null)
 				CurrentSong = song;
 			WindowsMediaPlayer.URL = CurrentSong.FilePath;
