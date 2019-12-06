@@ -149,6 +149,7 @@
 			this.DgrPlaylist.BackgroundColor = System.Drawing.Color.Beige;
 			this.DgrPlaylist.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
 			this.DgrPlaylist.Location = new System.Drawing.Point(3, 79);
+			this.DgrPlaylist.MultiSelect = false;
 			this.DgrPlaylist.Name = "DgrPlaylist";
 			this.DgrPlaylist.ReadOnly = true;
 			this.DgrPlaylist.RowHeadersWidth = 5;

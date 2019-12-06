@@ -208,7 +208,12 @@ namespace MusicPlayer
 				nextIndex = ShuffleIndex[CurrentShuffleIndexPlaying];
 			}
 			else
-				nextIndex = DgrPlaylist.SelectedRows[0].Index + movement;
+			{
+				if (DgrPlaylist.SelectedRows.Count > 0)
+					nextIndex = DgrPlaylist.SelectedRows[0].Index + movement;
+				else
+					nextIndex = 0;
+			}
 
 			if (nextIndex < 0)
 			{
@@ -298,6 +303,7 @@ namespace MusicPlayer
 
 		private void ResetPlayList()
 		{
+			WindowsMediaPlayer.controls.stop();
 			DgrPlaylist.ClearSelection();
 			DgrPlaylist.Rows[0].Selected = true;
 			BtnPlay.Text = PlayText[0];
@@ -434,7 +440,17 @@ namespace MusicPlayer
 			DgrPlaylist.DataSource = null;
 			DgrPlaylist.DataSource = sortedList;
 
-			ResetPlayList();
+			DgrPlaylist.ClearSelection();
+			foreach (DataGridViewRow s in DgrPlaylist.Rows)
+			{
+				var song = s.DataBoundItem as Song;
+				if (song == CurrentSong)
+					s.Selected = true;
+			}
+
+			InitShuffleIndex();
+			if (ChkShuffle.Checked)
+				MakeShuffleIndex();
 		}
 
 		public void ApplyPlaylist(Playlist playlist)
